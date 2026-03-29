@@ -22,10 +22,33 @@ from inference import run_inference
 # ── Page config ───────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="PNI Detection in Histopathology",
+    page_title="PNI Detection",
     page_icon="🔬",
-    layout="wide",
+    layout="centered",
+    initial_sidebar_state="collapsed",
 )
+
+# ── Mobile-friendly CSS ──────────────────────────────────────────────
+
+st.markdown("""
+<style>
+    /* Tighter padding on mobile */
+    .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 1rem;
+        max-width: 800px;
+    }
+    /* Smaller title on mobile */
+    @media (max-width: 640px) {
+        h1 { font-size: 1.4rem !important; }
+        .block-container { padding-left: 0.8rem; padding-right: 0.8rem; }
+    }
+    /* Make dataframe scroll horizontally */
+    .stDataFrame { overflow-x: auto; }
+    /* Full-width buttons */
+    .stButton > button { width: 100%; }
+</style>
+""", unsafe_allow_html=True)
 
 # ── Cached model loading (runs once) ─────────────────────────────────
 
@@ -61,72 +84,80 @@ def load_classifiers():
 MODEL, PROCESSOR, DEVICE = load_model()
 NERVE_CLF, PNI_CLF = load_classifiers()
 
-# ── Sidebar: Advanced Settings ───────────────────────────────────────
+# ── Settings (in expander, not sidebar — better for mobile) ──────────
 
-with st.sidebar:
-    st.header("⚙️ Settings")
-
-    with st.expander("Microscope UI Overlay Removal", expanded=False):
-        st.caption("Set pixel values to crop if your microscope adds a scale bar or metadata overlay.")
-        crop_top = st.number_input("Crop Top (px)", min_value=0, max_value=500, value=0)
-        crop_bottom = st.number_input("Crop Bottom (px)", min_value=0, max_value=500, value=0)
-        crop_left = st.number_input("Crop Left (px)", min_value=0, max_value=500, value=0)
-        crop_right = st.number_input("Crop Right (px)", min_value=0, max_value=500, value=0)
-
-    with st.expander("Detection Thresholds", expanded=False):
-        nerve_threshold = st.slider(
-            "Nerve Detection Threshold",
-            min_value=0.50, max_value=0.95, value=0.70, step=0.05,
-            help="Higher = fewer but more confident detections",
-        )
-        pni_threshold = st.slider(
-            "PNI Classification Threshold",
-            min_value=0.30, max_value=0.80, value=0.50, step=0.05,
-            help="Higher = more specific, lower = more sensitive",
-        )
-
-    st.divider()
-    st.caption("**Research Use Only.** Not validated for clinical diagnostic use.")
+# Defaults
+crop_top = 0
+crop_bottom = 0
+crop_left = 0
+crop_right = 0
+nerve_threshold = 0.70
+pni_threshold = 0.50
 
 # ── Main UI ──────────────────────────────────────────────────────────
 
-st.title("🔬 AI-Based PNI Detection in Histopathology")
+st.title("🔬 PNI Detection")
 
-st.markdown("""
-Upload an H&E-stained histopathology image to detect **nerve structures**
-and classify **perineural invasion (PNI)**.
+st.markdown(
+    "Upload an H&E image to detect **nerve structures** "
+    "and classify **perineural invasion (PNI)**."
+)
 
-The model uses [Phikon-v2](https://huggingface.co/owkin/phikon-v2), a
-pathology foundation model trained on 460 million tiles,
-with lightweight classifiers for nerve detection (AUC 0.999) and PNI
-classification (AUC 0.979).
-
-**Results:** 🟩 Green boxes = nerve without PNI · 🟥 Red boxes = nerve with PNI
-""")
+st.caption(
+    "🟩 Green = nerve, no PNI · 🟥 Red = nerve with PNI "
+    "· AUC 0.999 (nerve) · AUC 0.979 (PNI)"
+)
 
 # ── Image Upload ─────────────────────────────────────────────────────
 
 uploaded_file = st.file_uploader(
     "Upload H&E Image",
     type=["jpg", "jpeg", "png", "tif", "tiff", "bmp"],
-    help="Drag and drop or click to upload a histopathology image",
+    help="Drag and drop or click to upload",
+    label_visibility="collapsed",
 )
 
 # ── Example Images ───────────────────────────────────────────────────
 
 example_dir = Path(__file__).parent / "examples"
 if example_dir.exists() and not uploaded_file:
-    st.markdown("**Or try an example image:**")
+    st.markdown("**Or try an example:**")
     example_files = sorted(example_dir.glob("*.jpg"))
     if example_files:
-        cols = st.columns(len(example_files))
+        cols = st.columns(min(len(example_files), 3))
         for i, ex in enumerate(example_files):
-            with cols[i]:
+            with cols[i % 3]:
                 img = Image.open(ex)
-                st.image(img, caption=ex.stem.replace("_", " ").title(), use_container_width=True)
-                if st.button(f"Use this", key=f"ex_{i}"):
+                label = ex.stem.replace("_", " ").replace("nerve ", "").title()
+                st.image(img, caption=label, use_container_width=True)
+                if st.button("Use", key=f"ex_{i}"):
                     st.session_state["example_image"] = str(ex)
                     st.rerun()
+
+# ── Advanced Settings (collapsible, below upload) ────────────────────
+
+with st.expander("⚙️ Advanced Settings"):
+    st.markdown("**Detection Thresholds**")
+    nerve_threshold = st.slider(
+        "Nerve Detection Threshold",
+        min_value=0.50, max_value=0.95, value=0.70, step=0.05,
+        help="Higher = fewer but more confident detections",
+    )
+    pni_threshold = st.slider(
+        "PNI Classification Threshold",
+        min_value=0.30, max_value=0.80, value=0.50, step=0.05,
+        help="Higher = more specific, lower = more sensitive",
+    )
+
+    st.markdown("**Microscope UI Crop**")
+    st.caption("Remove scale bar or metadata overlay from edges.")
+    c1, c2 = st.columns(2)
+    with c1:
+        crop_top = st.number_input("Top (px)", min_value=0, max_value=500, value=0)
+        crop_left = st.number_input("Left (px)", min_value=0, max_value=500, value=0)
+    with c2:
+        crop_bottom = st.number_input("Bottom (px)", min_value=0, max_value=500, value=0)
+        crop_right = st.number_input("Right (px)", min_value=0, max_value=500, value=0)
 
 # ── Determine which image to analyze ─────────────────────────────────
 
@@ -142,10 +173,8 @@ elif "example_image" in st.session_state:
 # ── Run Inference ────────────────────────────────────────────────────
 
 if image_array is not None:
-    analyze = st.button("🔍 Analyze", type="primary", use_container_width=True)
-
-    if analyze:
-        with st.spinner("Analyzing image... This may take 10-30 seconds on first run."):
+    if st.button("🔍 Analyze", type="primary", use_container_width=True):
+        with st.spinner("Analyzing... this may take 10-30 seconds."):
             annotated, verdict, regions = run_inference(
                 image=image_array,
                 model=MODEL,
@@ -161,11 +190,11 @@ if image_array is not None:
                 pni_threshold=pni_threshold,
             )
 
-        # ── Display Results ──────────────────────────────────────
+        # ── Display Results (single-column, mobile-first) ────────
 
         st.divider()
 
-        # Verdict
+        # Verdict banner
         if "PNI Positive" in verdict:
             st.error(f"**{verdict}**")
         elif "PNI Negative" in verdict:
@@ -173,30 +202,32 @@ if image_array is not None:
         else:
             st.info(f"**{verdict}**")
 
-        # Annotated image
-        col1, col2 = st.columns([2, 1])
+        # Annotated image (full width)
+        st.image(annotated, caption="Detection Results", use_container_width=True)
 
-        with col1:
-            st.image(annotated, caption="Detection Results", use_container_width=True)
-
-        with col2:
-            if regions:
-                df = pd.DataFrame([
-                    {
-                        "Region": f"R{r['region_id']}",
-                        "Nerve Conf.": f"{r['nerve_prob']:.1%}",
-                        "PNI Prob.": f"{r['pni_prob']:.1%}",
-                        "PNI Status": "🔴 POSITIVE" if r["pni_positive"] else "🟢 Negative",
-                        "Patches": r["n_patches"],
-                    }
-                    for r in regions
-                ])
-                st.dataframe(df, use_container_width=True, hide_index=True)
-            else:
-                st.write("No nerve regions detected.")
-
-        # Store results in session
-        st.session_state["last_verdict"] = verdict
+        # Region details table (below image, scrollable)
+        if regions:
+            st.markdown("**Region Details**")
+            df = pd.DataFrame([
+                {
+                    "Region": f"R{r['region_id']}",
+                    "Nerve": f"{r['nerve_prob']:.0%}",
+                    "PNI": f"{r['pni_prob']:.0%}",
+                    "Status": "POSITIVE" if r["pni_positive"] else "Negative",
+                }
+                for r in regions
+            ])
+            st.dataframe(df, use_container_width=True, hide_index=True)
+        else:
+            st.write("No nerve regions detected.")
 
 elif uploaded_file is None and "example_image" not in st.session_state:
-    st.info("👆 Upload an image or select an example above to get started.")
+    st.info("Upload an image or select an example above to get started.")
+
+# ── Footer ───────────────────────────────────────────────────────────
+
+st.divider()
+st.caption(
+    "**Research Use Only** — Not validated for clinical diagnosis. "
+    "Built with [Phikon-v2](https://huggingface.co/owkin/phikon-v2)."
+)
