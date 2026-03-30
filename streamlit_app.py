@@ -96,17 +96,35 @@ pni_threshold = 0.50
 
 # ── Main UI ──────────────────────────────────────────────────────────
 
-st.title("🔬 PNI Detection")
+st.title("🔬 AI-Based PNI Detection in Histopathology")
+
+st.markdown("""
+Perineural invasion (PNI) — the infiltration of tumour cells into nerves — is a
+critical histopathological finding that influences staging, prognosis, and
+treatment decisions across multiple cancer types. Manual detection of PNI on
+H&E-stained slides is time-consuming, subjective, and prone to inter-observer
+variability.
+
+This tool uses **[Phikon-v2](https://huggingface.co/owkin/phikon-v2)**, a
+state-of-the-art pathology foundation model pre-trained on **460 million**
+histopathology image tiles, to automatically:
+
+1. **Detect nerve structures** in the tissue
+2. **Classify perineural invasion** for each detected nerve
+
+Upload an H&E-stained histopathology image below to get started.
+""")
 
 st.markdown(
-    "Upload an H&E image to detect **nerve structures** "
-    "and classify **perineural invasion (PNI)**."
+    "🟩 **Green boxes** = Nerve without PNI &nbsp;&nbsp;·&nbsp;&nbsp; "
+    "🟥 **Red boxes** = Nerve with PNI"
 )
 
-st.caption(
-    "🟩 Green = nerve, no PNI · 🟥 Red = nerve with PNI "
-    "· AUC 0.999 (nerve) · AUC 0.979 (PNI)"
-)
+col_m1, col_m2 = st.columns(2)
+with col_m1:
+    st.metric("Nerve Detection AUC", "0.999")
+with col_m2:
+    st.metric("PNI Classification AUC", "0.979")
 
 # ── Image Upload ─────────────────────────────────────────────────────
 
