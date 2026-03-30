@@ -52,22 +52,25 @@ st.markdown("""
 
 # ── Cached model loading (runs once) ─────────────────────────────────
 
-@st.cache_resource(show_spinner="Loading Phikon-v2 foundation model...")
+@st.cache_resource(show_spinner="Loading Phikon-v2 foundation model... (first time takes ~60s)")
 def load_model():
+    import gc
     device = "cuda" if torch.cuda.is_available() else (
         "mps" if torch.backends.mps.is_available() else "cpu"
     )
-    # Always use float16 to stay within Streamlit Cloud's 1GB RAM limit
+    # Use bfloat16 (better CPU support than float16) + low memory loading
     model = AutoModel.from_pretrained(
         "owkin/phikon-v2",
         trust_remote_code=True,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.bfloat16,
+        low_cpu_mem_usage=True,
     ).to(device).eval()
     processor = AutoImageProcessor.from_pretrained(
         "owkin/phikon-v2",
         trust_remote_code=True,
         use_fast=True,
     )
+    gc.collect()
     return model, processor, device
 
 
