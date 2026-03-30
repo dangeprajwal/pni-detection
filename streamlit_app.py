@@ -57,11 +57,11 @@ def load_model():
     device = "cuda" if torch.cuda.is_available() else (
         "mps" if torch.backends.mps.is_available() else "cpu"
     )
-    dtype = torch.float16 if device == "cuda" else torch.float32
+    # Always use float16 to stay within Streamlit Cloud's 1GB RAM limit
     model = AutoModel.from_pretrained(
         "owkin/phikon-v2",
         trust_remote_code=True,
-        torch_dtype=dtype,
+        torch_dtype=torch.float16,
     ).to(device).eval()
     processor = AutoImageProcessor.from_pretrained(
         "owkin/phikon-v2",
