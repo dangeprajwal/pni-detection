@@ -104,14 +104,14 @@ def extract_features(patches, model, processor, device):
         inputs = {k: v.to(device) for k, v in inputs.items()}
 
         with torch.inference_mode():
-            # Cast inputs to match model dtype (bfloat16/float16/float32)
             model_dtype = next(model.parameters()).dtype
-            if device.startswith("cuda") and model_dtype == torch.float32:
+            if device.startswith("cuda"):
                 with torch.autocast("cuda"):
                     out = model(**inputs)
             else:
-                inputs = {k: v.to(dtype=model_dtype) if v.is_floating_point() else v
-                          for k, v in inputs.items()}
+                if model_dtype != torch.float32:
+                    inputs = {k: v.to(dtype=model_dtype) if v.is_floating_point() else v
+                              for k, v in inputs.items()}
                 out = model(**inputs)
             all_feats.append(out.last_hidden_state[:, 0].float().cpu().numpy())
 

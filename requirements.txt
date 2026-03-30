@@ -1,5 +1,5 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch
+torch --no-cache-dir
 torchvision
 transformers[vision]
 scikit-learn
@@ -8,3 +8,4 @@ numpy
 Pillow
 joblib
 streamlit
+accelerate

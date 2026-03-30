@@ -54,17 +54,29 @@ st.markdown("""
 
 @st.cache_resource(show_spinner="Loading Phikon-v2 foundation model... (first time takes ~60s)")
 def load_model():
-    import gc
+    import gc, os
+    os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
+
     device = "cuda" if torch.cuda.is_available() else (
         "mps" if torch.backends.mps.is_available() else "cpu"
     )
-    # Use bfloat16 (better CPU support than float16) + low memory loading
-    model = AutoModel.from_pretrained(
-        "owkin/phikon-v2",
-        trust_remote_code=True,
-        torch_dtype=torch.bfloat16,
-        low_cpu_mem_usage=True,
-    ).to(device).eval()
+
+    # Use float32 on CPU (most compatible), float16 on GPU
+    if device == "cpu":
+        model = AutoModel.from_pretrained(
+            "owkin/phikon-v2",
+            trust_remote_code=True,
+            torch_dtype=torch.float32,
+            low_cpu_mem_usage=True,
+        ).eval()
+    else:
+        model = AutoModel.from_pretrained(
+            "owkin/phikon-v2",
+            trust_remote_code=True,
+            torch_dtype=torch.float16,
+            low_cpu_mem_usage=True,
+        ).to(device).eval()
+
     processor = AutoImageProcessor.from_pretrained(
         "owkin/phikon-v2",
         trust_remote_code=True,
